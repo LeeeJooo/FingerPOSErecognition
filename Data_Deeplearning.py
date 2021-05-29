@@ -6,18 +6,14 @@ import os
 import cv2
 import numpy as np
 
-
-finger_path = 'fingers'
+# Train Dataset 만들기
+finger_path = 'finger_demo'
 #categories = ['zero']
-categories = ['zero', 'one', 'two', 'three', 'four', 'five']
-
+categories = ['0', '1', '2', '3', '4', '5']
 num_class = len(categories)
-
 print(num_class)
-
 X = []
 Y = []
-
 for idx, category in enumerate(categories):
     label = [0 for i in range(num_class)]
     label[idx] = 1
@@ -33,13 +29,13 @@ for idx, category in enumerate(categories):
         # dirs: root 아래에 있는 폴더들
         # files: root 아래에 있는 파일들
 #        f.remove('.DS_Store')
-        print("root : ", top)
-        print("dir : ", dir)
-        print("files : ", f)
+#        print("root : ", top)
+#        print("dir : ", dir)
+#        print("files : ", f)
         for filename in f:
             img = cv2.imread(image_dir + filename)
             # img : filename Image의 객체 행렬을 return 받음
-            print(img.shape)    # (128, 128, 3)
+#            print(img.shape)    # (128, 128, 3)
             # 이미지는 3차원 행렬로 return
             # 128은 행(Y축), 128은 열(X축), 3은 행과 열이 만나는 지점의 값이 몇개의 원소로 이루어져 있는지를 나타냄
             # 위 값의 의미는 이미지의 사이즈가 128 * 128 이라는 의미
@@ -48,17 +44,36 @@ for idx, category in enumerate(categories):
             X.append(img/128)
             Y.append(label)
 
+# Test Dataset 만들기
+finger_path2 = 'fingers'
+categories2 = ['zero', 'one', 'two', 'three', 'four', 'five']
+num_class2 = len(categories2)
+Xx=[]
+Yy=[]
+for idx, category in enumerate(categories2):
+    label = [0 for i in range(num_class2)]
+    label[idx] = 1
+    image_dir = finger_path2 + '/' + category + '/'
+    for top, dir, f in os.walk(image_dir):
+#        f.remove('.DS_Store')
+        for filename in f:
+            img = cv2.imread(image_dir + filename)
+            Xx.append(img/128)
+            Yy.append(label)
+
 #print(X)
 #print(Y)
 
 Xtr = np.array(X)
 Ytr = np.array(Y)
+Xte = np.array(Xx)
+Yte = np.array(Yy)
+X_train, Y_train = Xtr, Ytr
+X_test, Y_test = Xte, Yte
 #print(Xtr)
 #print(Ytr)
-
-X_train, Y_train = Xtr, Ytr
-#print(X_train.shape)    # (5, 128, 128, 3), 5는 이미지 갯수
-#print(Y_train.shape)    # (5, 1), 5는 이미지 갯수
+print(X_train.shape)    # (5, 128, 128, 3), 5는 이미지 갯수
+print(Y_train.shape)    # (5, 1), 5는 이미지 갯수
 
 # 합성곱 신경망 구성하기
 # 필터로 특징을 뽑아주는 컨볼루션 레이어
@@ -143,4 +158,47 @@ model.add(Dense(50, activation='relu'))
 model.add(Dense(6, activation='softmax'))
 print(model.summary())
 
+# 모델 학습과정 설정하기
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+# compile() 메서드의 파라미터
+# optimizer : 훈련 과정을 설정, Adam, SGD 등이 있다
+# loss : 최적화 과정에서 최소화될 손실함수를 설정. MSE(평균 제곱 오차)와 binary_crossentropy가 자주 사용된다
+# metrics : 훈련을 모니터링하기 위해 사용된다.
 
+# 모델 학습시키기
+#model.fit(X_train, Y_train, epochs=1)
+history = model.fit(X_train, Y_train, batch_size =10, validation_split = 0.2, epochs = 5, verbose = 0)
+#print(model.summary())
+
+# 모델 학습과정 살펴보기
+print('## training loss and acc ##')
+print(history.history['loss'])
+print(history.history['val_loss'])
+#plt.plot(history.history['acc'])
+#plt.plot(history.history['val_acc'])
+#plt.legend(['training', 'validation'], loc = 'upper left')
+#plt.show()
+# history 객체: fit 함수의 반환 값
+# loss : 매 에포크 마다의 훈련 손실값
+# acc : 매 에포크 마다의 훈련 정확도
+# val_loss : 매 에포크 마다의 검증 손실값
+# val_acc : 매 에포크 마다의 검증 정확도
+
+# 모델 평가하기
+results = model.evaluate(X_test, Y_test, batch_size=32)
+print('Test accuracy: ', str(results))
+
+
+# 모델 사용하기
+Y_predict = model.predict(X_test)
+print(Y_predict.shape)
+print(len(Y_test))
+correct = 0
+for i in range(len(Y_test)):
+    print(" True : ", np.argmax(Y_test[i]), ", Predict : ", np.argmax(Y_predict[i]))
+    if (np.argmax(Y_test[i]) == np.argmax(Y_predict[i])) :
+        correct += 1
+print(len(Y_test), " 중 ", correct, " 개 일치")
+
+# 모델 저장하기
+#model.save('hand_detect_model.h5')
